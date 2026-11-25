@@ -23,6 +23,9 @@ def describe(token):
 class Parser:
     """Разбирает лексемы и сразу вычисляет значения и выражения.
 
+    Константы set существуют только при трансляции: в результат попадают
+    значения верхнего уровня, а константы подставляются в выражения.
+
     Грамматика:
         программа  = { "set" имя "=" значение | значение }
         значение   = число | строка | массив | "$" сумма "$"
@@ -73,17 +76,17 @@ class Parser:
             raise self.error("операнд должен быть числом", token)
 
     def parse_program(self):
-        """Разбирает весь текст и возвращает список пар (имя, значение).
+        """Разбирает весь текст и возвращает значения верхнего уровня.
 
-        У значения верхнего уровня, не связанного с константой, имя None.
+        Объявления констант в результат не попадают.
         """
-        items = []
+        values = []
         while self.peek().kind != END_KIND:
             if self.is_symbol("set"):
-                items.append(self.parse_set())
+                self.parse_set()
             else:
-                items.append((None, self.parse_value()))
-        return items
+                values.append(self.parse_value())
+        return values
 
     def parse_set(self):
         """Разбирает 'set имя = значение' и запоминает константу."""
@@ -97,9 +100,7 @@ class Parser:
         if token.text in self.constants:
             raise self.error(f"константа '{token.text}' уже задана", token)
         self.expect_symbol("=")
-        value = self.parse_value()
-        self.constants[token.text] = value
-        return token.text, value
+        self.constants[token.text] = self.parse_value()
 
     def parse_value(self):
         """Разбирает значение: число, строку, массив или выражение."""
@@ -209,5 +210,5 @@ class Parser:
 
 
 def parse(text):
-    """Разбирает текст конфигурации и возвращает список (имя, значение)."""
+    """Разбирает текст конфигурации и возвращает значения верхнего уровня."""
     return Parser(tokenize(text)).parse_program()

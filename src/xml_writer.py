@@ -1,6 +1,6 @@
 """Преобразование значений конфигурации в XML."""
 
-from xml.etree.ElementTree import Element, SubElement, indent, tostring
+from xml.etree.ElementTree import Element, indent, tostring
 
 XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>\n'
 
@@ -16,14 +16,9 @@ def value_to_element(value):
     return element
 
 
-def to_xml(items):
-    """Возвращает текст XML-документа для списка пар (имя, значение)."""
+def to_xml(values):
+    """Возвращает текст XML-документа для списка значений верхнего уровня."""
     root = Element("config")
-    for name, value in items:
-        element = value_to_element(value)
-        if name is None:
-            root.append(element)
-        else:
-            SubElement(root, "constant", name=name).append(element)
+    root.extend(value_to_element(value) for value in values)
     indent(root)
     return XML_DECLARATION + tostring(root, encoding="unicode") + "\n"
