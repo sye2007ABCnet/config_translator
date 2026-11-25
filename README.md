@@ -39,8 +39,12 @@ make examples
 Значением может быть число, строка, массив или выражение. Выражения
 поддерживают `+`, `-`, `*`, скобки и функции `sqrt(x)` и `min(a; b; ...)`.
 Аргументы функций разделяются `;`. В выражениях можно использовать ранее
-заданные константы. Значение вне `set` тоже допустимо и попадает в XML без
-имени.
+заданные константы.
+
+Константы `set` существуют только на этапе трансляции: в XML они не
+выводятся, а их значения подставляются в выражения. В XML попадают только
+значения верхнего уровня, то есть записанные вне `set`. Файл из одних
+объявлений даёт пустой `<config />`.
 
 Ограничения: константу нельзя объявить повторно, имена `set`, `sqrt` и `min`
 зарезервированы, `sqrt` возвращает целую часть корня, строка заканчивается
@@ -48,9 +52,9 @@ make examples
 
 ## Формат XML
 
-Корень `<config>`. Константа записывается как `<constant name="...">`, внутри
-значение: `<number>` (десятичная запись), `<string>` или `<array>` с вложенными
-элементами.
+Корень `<config>`. Внутри по одному элементу на каждое значение верхнего
+уровня, в порядке записи: `<number>` (десятичная запись), `<string>` или
+`<array>` с вложенными элементами. Тега для констант нет.
 
 ## Примеры
 
@@ -58,8 +62,8 @@ make examples
 
 | Файл | Область | Что показывает |
 |---|---|---|
-| `web_server.conf` | веб-сервер | комментарии, строки, массивы, `min`, умножение |
-| `game_level.conf` | игра | вложенные массивы, выражения в массиве, `sqrt`, `min` |
+| `web_server.conf` | веб-сервер | комментарии, константы в выражениях, строки, массивы, `min` |
+| `game_level.conf` | игра | вложенные массивы, константы в массиве, `sqrt`, `min` |
 | `pendulum_lab.conf` | лаборатория | вычитание, вложенный массив строк, `min` из трёх |
 
 Результат для `web_server.conf`:
@@ -67,32 +71,19 @@ make examples
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
-  <constant name="serverName">
-    <string>example server</string>
-  </constant>
-  <constant name="port">
-    <number>80</number>
-  </constant>
-  <constant name="workers">
-    <number>4</number>
-  </constant>
-  <constant name="maxConnections">
-    <number>800</number>
-  </constant>
-  <constant name="allowedHosts">
-    <array>
-      <string>localhost</string>
-      <string>example.org</string>
-      <string>www.example.org</string>
-    </array>
-  </constant>
-  <constant name="timeouts">
-    <array>
-      <number>10</number>
-      <number>30</number>
-      <number>20</number>
-    </array>
-  </constant>
+  <string>example server</string>
+  <number>80</number>
+  <number>800</number>
+  <array>
+    <string>localhost</string>
+    <string>example.org</string>
+    <string>www.example.org</string>
+  </array>
+  <array>
+    <number>10</number>
+    <number>30</number>
+    <number>20</number>
+  </array>
 </config>
 ```
 
