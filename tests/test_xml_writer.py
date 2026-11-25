@@ -47,47 +47,59 @@ class ToXmlTests(unittest.TestCase):
         """Пустой список даёт пустой корень."""
         self.assertEqual(to_xml([]), HEADER + "<config />\n")
 
-    def test_constant(self):
-        """Константа — элемент constant с атрибутом name."""
+    def test_number_in_root(self):
+        """Значение попадает прямо в корень, без обёрток."""
         self.assertEqual(
-            to_xml([("port", 80)]),
-            HEADER
-            + "<config>\n"
-            + '  <constant name="port">\n'
-            + "    <number>80</number>\n"
-            + "  </constant>\n"
-            + "</config>\n",
+            to_xml([80]),
+            HEADER + "<config>\n  <number>80</number>\n</config>\n",
         )
 
-    def test_top_level_value(self):
-        """Значение без имени попадает прямо в корень."""
+    def test_string_in_root(self):
+        """Строка попадает прямо в корень."""
         self.assertEqual(
-            to_xml([(None, "x")]),
+            to_xml(["x"]),
             HEADER + "<config>\n  <string>x</string>\n</config>\n",
         )
 
+    def test_nested_array_document(self):
+        """Вложенный массив записывается с отступами."""
+        self.assertEqual(
+            to_xml([[1, [2]]]),
+            HEADER
+            + "<config>\n"
+            + "  <array>\n"
+            + "    <number>1</number>\n"
+            + "    <array>\n"
+            + "      <number>2</number>\n"
+            + "    </array>\n"
+            + "  </array>\n"
+            + "</config>\n",
+        )
+
+    def test_no_constant_tag(self):
+        """Тега constant в документе нет."""
+        self.assertNotIn("constant", to_xml([1, "a", [2]]))
+
     def test_order_is_kept(self):
         """Порядок элементов сохраняется."""
-        root = fromstring(to_xml([("b", 1), (None, 2), ("a", 3)]))
+        root = fromstring(to_xml([1, "a", [2]]))
         self.assertEqual(
-            [child.tag for child in root], ["constant", "number", "constant"]
+            [child.tag for child in root], ["number", "string", "array"]
         )
-        self.assertEqual(root[0].get("name"), "b")
-        self.assertEqual(root[2].get("name"), "a")
 
     def test_special_characters_are_escaped(self):
         """Служебные символы XML экранируются."""
-        root = fromstring(to_xml([(None, "<a & b>")]))
+        root = fromstring(to_xml(["<a & b>"]))
         self.assertEqual(root[0].text, "<a & b>")
 
     def test_spaces_in_string_are_kept(self):
         """Пробелы по краям строки сохраняются."""
-        root = fromstring(to_xml([(None, "  x  ")]))
+        root = fromstring(to_xml(["  x  "]))
         self.assertEqual(root[0].text, "  x  ")
 
     def test_empty_string_and_array(self):
         """Пустая строка и пустой массив."""
-        root = fromstring(to_xml([(None, ""), (None, [])]))
+        root = fromstring(to_xml(["", []]))
         self.assertEqual([child.tag for child in root], ["string", "array"])
 
 

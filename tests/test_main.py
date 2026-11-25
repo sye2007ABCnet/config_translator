@@ -32,10 +32,9 @@ def element_to_value(element):
     return [element_to_value(child) for child in element]
 
 
-def constants_of(xml_text):
-    """Возвращает словарь «имя константы -> значение» из XML."""
-    root = fromstring(xml_text)
-    return {item.get("name"): element_to_value(item[0]) for item in root}
+def values_of(xml_text):
+    """Возвращает список значений верхнего уровня из XML."""
+    return [element_to_value(child) for child in fromstring(xml_text)]
 
 
 class MainTestCase(unittest.TestCase):
@@ -73,9 +72,22 @@ class TranslateTests(MainTestCase):
 
     def test_success(self):
         """Результат записан в выходной файл, код 0."""
+        code, xml, _ = self.translate("0b101")
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(values_of(xml), [5])
+
+    def test_declared_constant_is_not_written(self):
+        """Объявленная константа не попадает в XML."""
         code, xml, _ = self.translate("set a = 0b101")
         self.assertEqual(code, EXIT_OK)
-        self.assertEqual(constants_of(xml), {"a": 5})
+        self.assertEqual(values_of(xml), [])
+        self.assertNotIn("constant", xml)
+
+    def test_used_constant_is_substituted(self):
+        """Использованная константа подставляется значением."""
+        _, xml, _ = self.translate("set a = 0b101\n$a + 0b1$")
+        self.assertEqual(values_of(xml), [6])
+        self.assertNotIn("constant", xml)
 
     def test_message_about_result(self):
         """После успешной записи выводится сообщение."""
@@ -131,7 +143,7 @@ class TranslateTests(MainTestCase):
         """Работают длинные имена ключей."""
         output = self.path("out.xml")
         code, _, _ = run_main(
-            ["--input", self.write_input("set a = 0b1"), "--output", output]
+            ["--input", self.write_input("0b1"), "--output", output]
         )
         self.assertEqual(code, EXIT_OK)
 
@@ -141,75 +153,77 @@ class TranslateTests(MainTestCase):
             "' начало\n"
             "{ многострочный\nкомментарий }\n"
             "set n = 0b11\n"
-            "set data = [q(a); [$n * n$; [$min(n; 0b10)$]]]\n"
+            "[q(a); [$n * n$; [$min(n; 0b10)$]]]\n"
         )
         _, xml, _ = self.translate(text)
-        self.assertEqual(constants_of(xml), {"n": 3, "data": ["a", [9, [2]]]})
+        self.assertEqual(values_of(xml), [["a", [9, [2]]]])
 
 
 class ExampleTests(MainTestCase):
     """Три примера конфигураций из разных предметных областей."""
 
     def translate_example(self, name):
-        """Переводит пример и возвращает его константы."""
+        """Переводит пример и возвращает значения верхнего уровня."""
         output = self.path("out.xml")
         code, _, _ = run_main(["-i", example_path(name), "-o", output])
         self.assertEqual(code, EXIT_OK)
         with open(output, encoding="utf-8") as source:
-            return constants_of(source.read())
+            return values_of(source.read())
 
     def test_web_server(self):
         """Веб-сервер."""
         self.assertEqual(
             self.translate_example("web_server.conf"),
-            {
-                "serverName": "example server",
-                "port": 80,
-                "workers": 4,
-                "maxConnections": 800,
-                "allowedHosts": [
-                    "localhost",
-                    "example.org",
-                    "www.example.org",
-                ],
-                "timeouts": [10, 30, 20],
-            },
+            [
+                "example server",
+                80,
+                800,
+                ["localhost", "example.org", "www.example.org"],
+                [10, 30, 20],
+            ],
         )
 
     def test_game_level(self):
         """Игровой уровень."""
         self.assertEqual(
             self.translate_example("game_level.conf"),
-            {
-                "levelName": "Cave of Echoes",
-                "mapSide": 32,
-                "mapArea": 1024,
-                "spawnPoints": [[1, 1], [30, 5], [31, 31]],
-                "monsters": ["bat", "spider", "golem"],
-                "bossHealth": 320,
-                "scanRadius": 32,
-            },
+            [
+                "Cave of Echoes",
+                32,
+                1024,
+                [[1, 1], [30, 5], [31, 31]],
+                ["bat", "spider", "golem"],
+                320,
+                32,
+            ],
         )
 
     def test_pendulum_lab(self):
         """Лабораторная установка."""
         self.assertEqual(
             self.translate_example("pendulum_lab.conf"),
-            {
-                "experiment": "Pendulum period",
-                "lengths": [100, 200, 400],
-                "measurements": 5,
-                "totalRuns": 15,
-                "baseLength": 100,
-                "deltaLength": 100,
-                "precision": 10,
-                "instruments": [
-                    "stopwatch",
-                    "ruler",
-                    ["sensor A", "sensor B"],
-                ],
-            },
+            [
+                "Pendulum period",
+                [100, 200, 400],
+                15,
+                100,
+                100,
+                10,
+                ["stopwatch", "ruler", ["sensor A", "sensor B"]],
+            ],
         )
+
+    def test_examples_have_no_constant_tag(self):
+        """В результатах примеров нет тега constant."""
+        for name in (
+            "web_server.conf",
+            "game_level.conf",
+            "pendulum_lab.conf",
+        ):
+            output = self.path("out.xml")
+            run_main(["-i", example_path(name), "-o", output])
+            with open(output, encoding="utf-8") as source:
+                self.assertNotIn("constant", source.read())
 
 
 if __name__ == "__main__":
